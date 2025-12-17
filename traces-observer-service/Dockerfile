@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Add build args for cross-platform support
 ARG TARGETOS
