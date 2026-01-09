@@ -134,8 +134,14 @@ function ProjectCard(props: {
                 display="flex"
                 flexDirection="column"
                 alignItems="flex-start"
+                width={1}
               >
-                <Typography variant="h5" noWrap textOverflow="ellipsis" maxWidth="70%">
+                <Typography
+                  variant="h5"
+                  noWrap
+                  textOverflow="ellipsis"
+                  maxWidth="70%"
+                >
                   {project.displayName}
                 </Typography>
                 <Typography variant="caption">
@@ -153,7 +159,6 @@ function ProjectCard(props: {
                 variant="body2"
                 color="textSecondary"
                 sx={{
-   
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "flex-start",
@@ -235,7 +240,7 @@ export function ProjectList() {
         confirmButtonText: "Delete",
       });
     },
-    [addConfirmation, deleteProject, orgId]
+    [addConfirmation, deleteProject, orgId],
   );
 
   const [search, setSearch] = useState("");
@@ -243,9 +248,9 @@ export function ProjectList() {
   const filteredProjects = useMemo(
     () =>
       projects?.projects?.filter((project) =>
-        project.displayName.toLowerCase().includes(search.toLowerCase())
+        project.displayName.toLowerCase().includes(search.toLowerCase()),
       ) || [],
-    [projects, search]
+    [projects, search],
   );
 
   const handleRefresh = useCallback(() => {
@@ -298,7 +303,7 @@ export function ProjectList() {
               absoluteRouteMap.children.org.children.newProject.path,
               {
                 orgId: orgId,
-              }
+              },
             )}
           >
             Add Project
