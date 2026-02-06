@@ -7,10 +7,7 @@
 package wiring
 
 import (
-	"log/slog"
-
 	"github.com/google/wire"
-
 	"github.com/wso2/ai-agent-management-platform/agent-manager-service/clients/observabilitysvc"
 	"github.com/wso2/ai-agent-management-platform/agent-manager-service/clients/openchoreosvc/auth"
 	"github.com/wso2/ai-agent-management-platform/agent-manager-service/clients/openchoreosvc/client"
@@ -19,6 +16,7 @@ import (
 	"github.com/wso2/ai-agent-management-platform/agent-manager-service/controllers"
 	"github.com/wso2/ai-agent-management-platform/agent-manager-service/middleware/jwtassertion"
 	"github.com/wso2/ai-agent-management-platform/agent-manager-service/services"
+	"log/slog"
 )
 
 // Injectors from wire.go:
@@ -48,6 +46,11 @@ func InitializeAppParams(cfg *config.Config) (*AppParams, error) {
 	}
 	agentTokenController := controllers.NewAgentTokenController(agentTokenManagerService)
 	repositoryController := controllers.NewRepositoryController(repositoryService)
+	environmentService := services.NewEnvironmentService(logger)
+	environmentController := controllers.NewEnvironmentController(environmentService)
+	iGatewayAdapter := ProvideGatewayAdapter(logger)
+	gatewayService := services.NewGatewayService(iGatewayAdapter, logger)
+	gatewayController := controllers.NewGatewayController(gatewayService)
 	appParams := &AppParams{
 		AuthMiddleware:          middleware,
 		AgentController:         agentController,
@@ -55,6 +58,8 @@ func InitializeAppParams(cfg *config.Config) (*AppParams, error) {
 		ObservabilityController: observabilityController,
 		AgentTokenController:    agentTokenController,
 		RepositoryController:    repositoryController,
+		EnvironmentController:   environmentController,
+		GatewayController:       gatewayController,
 	}
 	return appParams, nil
 }
@@ -79,6 +84,11 @@ func InitializeTestAppParamsWithClientMocks(cfg *config.Config, authMiddleware j
 	}
 	agentTokenController := controllers.NewAgentTokenController(agentTokenManagerService)
 	repositoryController := controllers.NewRepositoryController(repositoryService)
+	environmentService := services.NewEnvironmentService(logger)
+	environmentController := controllers.NewEnvironmentController(environmentService)
+	iGatewayAdapter := ProvideGatewayAdapter(logger)
+	gatewayService := services.NewGatewayService(iGatewayAdapter, logger)
+	gatewayController := controllers.NewGatewayController(gatewayService)
 	appParams := &AppParams{
 		AuthMiddleware:          authMiddleware,
 		AgentController:         agentController,
@@ -86,6 +96,8 @@ func InitializeTestAppParamsWithClientMocks(cfg *config.Config, authMiddleware j
 		ObservabilityController: observabilityController,
 		AgentTokenController:    agentTokenController,
 		RepositoryController:    repositoryController,
+		EnvironmentController:   environmentController,
+		GatewayController:       gatewayController,
 	}
 	return appParams, nil
 }
@@ -100,9 +112,9 @@ var clientProviderSet = wire.NewSet(observabilitysvc.NewObservabilitySvcClient, 
 	ProvideOCClient,
 )
 
-var serviceProviderSet = wire.NewSet(services.NewAgentManagerService, services.NewInfraResourceManager, services.NewObservabilityManager, services.NewAgentTokenManagerService, services.NewRepositoryService)
+var serviceProviderSet = wire.NewSet(services.NewAgentManagerService, services.NewInfraResourceManager, services.NewObservabilityManager, services.NewAgentTokenManagerService, services.NewRepositoryService, services.NewEnvironmentService, services.NewGatewayService)
 
-var controllerProviderSet = wire.NewSet(controllers.NewAgentController, controllers.NewInfraResourceController, controllers.NewObservabilityController, controllers.NewAgentTokenController, controllers.NewRepositoryController)
+var controllerProviderSet = wire.NewSet(controllers.NewAgentController, controllers.NewInfraResourceController, controllers.NewObservabilityController, controllers.NewAgentTokenController, controllers.NewRepositoryController, controllers.NewEnvironmentController, controllers.NewGatewayController)
 
 var testClientProviderSet = wire.NewSet(
 	ProvideTestOpenChoreoClient,
@@ -134,6 +146,10 @@ func ProvideOCClient(cfg config.Config, authProvider client.AuthProvider) (clien
 
 var loggerProviderSet = wire.NewSet(
 	ProvideLogger,
+)
+
+var gatewayProviderSet = wire.NewSet(
+	ProvideGatewayAdapter,
 )
 
 // ProvideTestOpenChoreoClient extracts the OpenChoreoClient from TestClients
