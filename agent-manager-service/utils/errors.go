@@ -33,6 +33,17 @@ var (
 	ErrInvalidInput               = errors.New("invalid input")
 	ErrImmutableFieldChange       = errors.New("cannot change immutable field")
 
+	// Gateway management errors
+	ErrGatewayNotFound          = errors.New("gateway not found")
+	ErrGatewayAlreadyExists     = errors.New("gateway already exists")
+	ErrEnvironmentAlreadyExists = errors.New("environment already exists")
+	ErrEnvironmentHasGateways   = errors.New("environment has associated gateways")
+
+	// LLM Provider errors
+	ErrLLMProviderNotFound         = errors.New("LLM provider not found")
+	ErrLLMProviderAlreadyExists    = errors.New("LLM provider already exists")
+	ErrLLMProviderTemplateNotFound = errors.New("LLM provider template not found")
+
 	// Request errors
 	ErrBadRequest = errors.New("bad request")
 

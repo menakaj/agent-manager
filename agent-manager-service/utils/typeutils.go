@@ -19,8 +19,10 @@ package utils
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 func StrPointerAsStr(v *string, defaultValue string) string {
@@ -52,6 +54,22 @@ func BoolPointerAsBool(v *bool, defaultValue bool) bool {
 func IntPointerAsInt(v *int32, defaultValue int32) int32 {
 	if v == nil {
 		return defaultValue
+	}
+	return *v
+}
+
+// UUIDPointerAsStr converts a UUID pointer to string
+func UUIDPointerAsStr(v *openapi_types.UUID) string {
+	if v == nil {
+		return ""
+	}
+	return v.String()
+}
+
+// TimePointerAsTime converts a time pointer to time.Time (zero time if nil)
+func TimePointerAsTime(v *time.Time) time.Time {
+	if v == nil {
+		return time.Time{}
 	}
 	return *v
 }

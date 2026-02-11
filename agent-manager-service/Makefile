@@ -57,6 +57,15 @@ gen-oc-client: ## Generate OpenChoreo API client from local OpenAPI spec.
 	@$(MAKE) fmt
 	@echo "OpenChoreo client generated successfully"
 
+
+.PHONY: gen-api-platform-client
+gen-api-platform-client: ## Generate API Platform API client from local OpenAPI spec.
+	@echo "Generating API Platform client from local spec"
+	@oapi-codegen -config clients/api-platform-svc/gen/oapi-codegen.yaml https://raw.githubusercontent.com/wso2/api-platform/refs/heads/main/platform-api/src/resources/openapi.yaml
+	@oapi-codegen -config clients/api-platform-svc/gen/oapi-codegen-client.yaml https://raw.githubusercontent.com/wso2/api-platform/refs/heads/main/platform-api/src/resources/openapi.yaml
+	@$(MAKE) fmt
+	@echo "API Platform client generated successfully"
+
 .PHONY: codegenfmt-check
 codegenfmt-check:
 	@$(MAKE) wire
