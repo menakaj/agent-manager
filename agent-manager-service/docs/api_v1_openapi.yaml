@@ -1213,6 +1213,237 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a new environment
+      description: |
+        Creates a new deployment environment within an organization.
+        Environments represent logical deployment stages (e.g., development, staging, production)
+        that can be associated with gateways.
+      operationId: createEnvironment
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEnvironmentRequest"
+      responses:
+        "201":
+          description: Environment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Environment already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/environments/{envId}:
+    get:
+      summary: Get environment details
+      description: Retrieves detailed information about a specific environment
+      operationId: getEnvironment
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: envId
+          in: path
+          required: true
+          description: Environment UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Environment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        "404":
+          description: Environment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Update environment
+      description: Updates display name and/or description of an environment
+      operationId: updateEnvironment
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: envId
+          in: path
+          required: true
+          description: Environment UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEnvironmentRequest"
+      responses:
+        "200":
+          description: Environment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Environment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Delete environment
+      description: |
+        Deletes an environment and all associated gateway mappings.
+        This operation cannot be undone.
+      operationId: deleteEnvironment
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: envId
+          in: path
+          required: true
+          description: Environment UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Environment deleted successfully
+        "404":
+          description: Environment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Cannot delete environment with associated gateways
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/environments/{envId}/gateways:
+    get:
+      summary: Get gateways for an environment
+      description: |
+        Retrieves all gateways associated with the specified environment.
+        Includes gateway details from Platform API and automatically cleans up orphaned mappings.
+      operationId: getEnvironmentGateways
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: envId
+          in: path
+          required: true
+          description: Environment UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of gateways for the environment
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - gateways
+                  - total
+                properties:
+                  gateways:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GatewayResponse"
+                  total:
+                    type: integer
+                    description: Total number of gateways
+                  metadata:
+                    type: object
+                    description: Additional metadata
+                    properties:
+                      orphanedMappingsRemoved:
+                        type: integer
+                        description: Number of orphaned mappings cleaned up
+        "404":
+          description: Environment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /orgs/{orgName}/data-planes:
     get:
       summary: List all data planes in an organization
@@ -1234,6 +1465,575 @@ paths:
                 $ref: "#/components/schemas/DataPlaneListResponse"
         "404":
           description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/gateways:
+    post:
+      summary: Register a new gateway
+      description: |
+        Registers a new gateway in Platform API and creates environment associations.
+        The gateway data is stored in Platform API; Agent Manager only stores the mappings.
+      operationId: registerGateway
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGatewayRequest"
+      responses:
+        "201":
+          description: Gateway registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Environment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: List all gateways
+      description: |
+        Retrieves all gateways with optional filtering by environment.
+        Fetches gateway data from Platform API and enriches with environment associations.
+      operationId: listGateways
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: environment
+          in: query
+          description: Filter by environment UUID
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by gateway status
+          required: false
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, PENDING]
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of results to skip
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: List of gateways
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayListResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/gateways/{gatewayId}:
+    get:
+      summary: Get gateway details
+      description: |
+        Retrieves detailed information about a specific gateway from Platform API,
+        enriched with associated environment data.
+      operationId: getGateway
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: gatewayId
+          in: path
+          required: true
+          description: Gateway UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Gateway details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayResponse"
+        "404":
+          description: Gateway not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Update gateway
+      description: Updates gateway display name in Platform API
+      operationId: updateGateway
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: gatewayId
+          in: path
+          required: true
+          description: Gateway UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGatewayRequest"
+      responses:
+        "200":
+          description: Gateway updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Gateway not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Delete gateway
+      description: |
+        Deletes a gateway from Platform API and cleans up all environment mappings.
+        This operation cannot be undone.
+      operationId: deleteGateway
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: gatewayId
+          in: path
+          required: true
+          description: Gateway UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Gateway deleted successfully
+        "404":
+          description: Gateway not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/gateways/{gatewayId}/environments:
+    get:
+      summary: Get environments for a gateway
+      description: Retrieves all environments associated with the specified gateway
+      operationId: getGatewayEnvironments
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: gatewayId
+          in: path
+          required: true
+          description: Gateway UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of environments
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - environments
+                  - total
+                properties:
+                  environments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EnvironmentResponse"
+                  total:
+                    type: integer
+        "404":
+          description: Gateway not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/gateways/{gatewayId}/environments/{envId}:
+    post:
+      summary: Assign gateway to environment
+      description: |
+        Creates an association between a gateway and an environment.
+        Validates that both the gateway (in Platform API) and environment exist.
+      operationId: assignGatewayToEnvironment
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: gatewayId
+          in: path
+          required: true
+          description: Gateway UUID
+          schema:
+            type: string
+            format: uuid
+        - name: envId
+          in: path
+          required: true
+          description: Environment UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Gateway assigned to environment successfully
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Gateway or environment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Association already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Remove gateway from environment
+      description: Removes the association between a gateway and an environment
+      operationId: removeGatewayFromEnvironment
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: gatewayId
+          in: path
+          required: true
+          description: Gateway UUID
+          schema:
+            type: string
+            format: uuid
+        - name: envId
+          in: path
+          required: true
+          description: Environment UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Gateway removed from environment successfully
+        "404":
+          description: Association not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/llm-providers:
+    post:
+      summary: Create a new LLM provider
+      description: |
+        Creates a new LLM provider in Platform API and creates gateway associations.
+        The provider data is stored in Platform API; Agent Manager only stores the mappings.
+      operationId: createLLMProvider
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLLMProviderRequest"
+      responses:
+        "201":
+          description: LLM provider created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LLMProviderResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Gateway not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: List all LLM providers
+      description: |
+        Retrieves all LLM providers with optional filtering by gateway.
+        Fetches provider data from Platform API and enriches with gateway associations.
+      operationId: listLLMProviders
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: gateway
+          in: query
+          description: Filter by gateway UUID
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of results to skip
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: List of LLM providers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LLMProviderListResponse"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orgs/{orgName}/llm-providers/{providerId}:
+    get:
+      summary: Get LLM provider details
+      description: |
+        Retrieves detailed information about a specific LLM provider from Platform API,
+        enriched with associated gateway data.
+      operationId: getLLMProvider
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: providerId
+          in: path
+          required: true
+          description: Provider ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: LLM provider details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LLMProviderResponse"
+        "404":
+          description: Provider not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Platform API unavailable
           content:
             application/json:
               schema:
@@ -2443,6 +3243,339 @@ components:
       items:
         $ref: "#/components/schemas/Environment"
       description: List of environments
+
+    # Gateway Integration Schemas
+    CreateEnvironmentRequest:
+      type: object
+      required:
+        - name
+        - displayName
+      properties:
+        name:
+          type: string
+          description: Unique name for the environment (e.g., "production", "staging")
+          pattern: "^[a-z0-9-]{1,64}$"
+          example: "production"
+        displayName:
+          type: string
+          description: Human-readable display name
+          maxLength: 128
+          example: "Production Environment"
+        description:
+          type: string
+          description: Optional description of the environment
+          example: "Production deployment environment"
+
+    UpdateEnvironmentRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: Updated display name
+          maxLength: 128
+          example: "Production Environment"
+        description:
+          type: string
+          description: Updated description
+          example: "Production deployment environment"
+
+    EnvironmentResponse:
+      type: object
+      required:
+        - uuid
+        - organizationId
+        - name
+        - displayName
+        - createdAt
+        - updatedAt
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Unique identifier for the environment
+        organizationId:
+          type: string
+          format: uuid
+          description: Organization UUID
+        name:
+          type: string
+          description: Unique environment name
+        displayName:
+          type: string
+          description: Human-readable display name
+        description:
+          type: string
+          description: Environment description
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when environment was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when environment was last updated
+
+    CreateGatewayRequest:
+      type: object
+      required:
+        - name
+        - displayName
+        - vhost
+      properties:
+        name:
+          type: string
+          description: Unique gateway name
+          pattern: "^[a-z0-9-]{1,64}$"
+          example: "prod-gateway-1"
+        displayName:
+          type: string
+          description: Human-readable display name
+          maxLength: 128
+          example: "Production Gateway 1"
+        vhost:
+          type: string
+          description: Virtual host/domain for the gateway
+          example: "api.example.com"
+        region:
+          type: string
+          description: Geographic region
+          example: "us-east-1"
+        environmentIds:
+          type: array
+          description: List of environment UUIDs to associate with gateway
+          items:
+            type: string
+            format: uuid
+          example:
+            - "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    UpdateGatewayRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: Updated display name
+          maxLength: 128
+
+    GatewayResponse:
+      type: object
+      required:
+        - uuid
+        - name
+        - displayName
+        - vhost
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Gateway UUID from Platform API
+        name:
+          type: string
+          description: Gateway name
+        displayName:
+          type: string
+          description: Display name
+        vhost:
+          type: string
+          description: Virtual host
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, PENDING]
+          description: Gateway status
+        region:
+          type: string
+          description: Geographic region
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        environments:
+          type: array
+          description: Environments associated with this gateway
+          items:
+            $ref: "#/components/schemas/EnvironmentSummary"
+
+    GatewayListResponse:
+      type: object
+      required:
+        - gateways
+        - total
+        - limit
+        - offset
+      properties:
+        gateways:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayResponse"
+          description: List of gateways
+        total:
+          type: integer
+          description: Total number of gateways
+        limit:
+          type: integer
+          description: Maximum number of results returned
+        offset:
+          type: integer
+          description: Number of results skipped
+        metadata:
+          type: object
+          description: Additional metadata (e.g., orphaned mappings removed)
+          properties:
+            orphanedMappingsRemoved:
+              type: integer
+              description: Number of orphaned mappings cleaned up
+
+    EnvironmentSummary:
+      type: object
+      required:
+        - uuid
+        - name
+        - displayName
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Environment UUID
+        name:
+          type: string
+          description: Environment name
+        displayName:
+          type: string
+          description: Environment display name
+
+    CreateLLMProviderRequest:
+      type: object
+      required:
+        - id
+        - name
+        - version
+        - template
+        - upstream
+        - vhost
+      properties:
+        id:
+          type: string
+          description: Unique provider identifier
+          example: "openai-gpt4"
+        name:
+          type: string
+          description: Provider name
+          example: "OpenAI GPT-4"
+        version:
+          type: string
+          description: Provider version
+          example: "1.0.0"
+        template:
+          type: string
+          description: Template name (e.g., "openai")
+          example: "openai"
+        upstream:
+          type: object
+          description: Upstream configuration
+          additionalProperties: true
+        description:
+          type: string
+          description: Provider description
+        context:
+          type: string
+          description: Deployment context
+        vhost:
+          type: string
+          description: Virtual host for provider
+        gatewayIds:
+          type: array
+          description: Gateway UUIDs to deploy provider to
+          items:
+            type: string
+            format: uuid
+
+    LLMProviderResponse:
+      type: object
+      required:
+        - id
+        - name
+        - version
+        - template
+        - vhost
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          description: Provider ID
+        name:
+          type: string
+          description: Provider name
+        version:
+          type: string
+          description: Provider version
+        template:
+          type: string
+          description: Template name
+        upstream:
+          type: object
+          description: Upstream configuration
+          additionalProperties: true
+        description:
+          type: string
+          description: Provider description
+        context:
+          type: string
+          description: Deployment context
+        vhost:
+          type: string
+          description: Virtual host
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        gateways:
+          type: array
+          description: Gateways associated with provider
+          items:
+            $ref: "#/components/schemas/GatewaySummary"
+
+    LLMProviderListResponse:
+      type: object
+      required:
+        - providers
+        - total
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/LLMProviderResponse"
+          description: List of LLM providers
+        total:
+          type: integer
+          description: Total number of providers
+
+    GatewaySummary:
+      type: object
+      required:
+        - uuid
+        - name
+        - displayName
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Gateway UUID
+        name:
+          type: string
+          description: Gateway name
+        displayName:
+          type: string
+          description: Gateway display name
 
     DataPlane:
       type: object
