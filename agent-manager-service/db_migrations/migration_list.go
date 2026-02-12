@@ -16,7 +16,7 @@
 
 package dbmigrations
 
-const latestVersion = 8
+const latestVersion = 6
 
 // migration list sorted by version.  Add new migrations to the end of the list.
 // Previous migrations should not be modified.
@@ -25,8 +25,6 @@ var migrations = []migration{
 	migration002,
 	migration003,
 	migration004,
-	migration005, // API Platform gateways
-	migration006, // API Platform artifacts and APIs
-	migration007, // API Platform developer portals
-	migration008, // API Platform LLM providers
+	migration005,
+	migration006,
 }
