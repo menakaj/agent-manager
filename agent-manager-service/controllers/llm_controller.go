@@ -581,7 +581,7 @@ func (c *llmController) UpdateLLMProvider(w http.ResponseWriter, r *http.Request
 
 	log.Info("UpdateLLMProvider: calling service layer", "orgName", orgName, "orgID", orgID, "providerID", providerID)
 
-	updated, err := c.providerService.Update(orgID, providerID, provider)
+	updated, err := c.providerService.Update(providerID, orgID, provider)
 	if err != nil {
 		switch {
 		case errors.Is(err, utils.ErrLLMProviderNotFound):
@@ -632,7 +632,7 @@ func (c *llmController) DeleteLLMProvider(w http.ResponseWriter, r *http.Request
 
 	log.Info("DeleteLLMProvider: calling service layer", "orgName", orgName, "orgID", orgID, "providerID", providerID)
 
-	if err := c.providerService.Delete(orgID, providerID); err != nil {
+	if err := c.providerService.Delete(providerID, orgID); err != nil {
 		switch {
 		case errors.Is(err, utils.ErrLLMProviderNotFound):
 			log.Warn("DeleteLLMProvider: provider not found", "orgName", orgName, "providerID", providerID)

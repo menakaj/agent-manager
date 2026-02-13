@@ -206,12 +206,20 @@ func (r *GatewayRepo) GetTokenByUUID(tokenId string) (*models.GatewayToken, erro
 // RevokeToken updates token status to revoked
 func (r *GatewayRepo) RevokeToken(tokenId string) error {
 	now := time.Now()
-	return r.db.Model(&models.GatewayToken{}).
+	result := r.db.Model(&models.GatewayToken{}).
 		Where("uuid = ?", tokenId).
 		Updates(map[string]interface{}{
 			"status":     "revoked",
 			"revoked_at": now,
-		}).Error
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // CountActiveTokens counts the number of active tokens for a gateway

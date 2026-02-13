@@ -46,6 +46,9 @@ func MakeHTTPHandler(params *wiring.AppParams) http.Handler {
 	RegisterGatewayRoutes(apiMux, params.GatewayController)
 	RegisterLLMRoutes(apiMux, params.LLMController)
 	RegisterLLMDeploymentRoutes(apiMux, params.LLMDeploymentController)
+	RegisterLLMProviderAPIKeyRoutes(apiMux, params.LLMProviderAPIKeyController)
+	RegisterLLMProxyAPIKeyRoutes(apiMux, params.LLMProxyAPIKeyController)
+	RegisterLLMProxyDeploymentRoutes(apiMux, params.LLMProxyDeploymentController)
 
 	// Apply middleware in reverse order (last middleware is applied first)
 	apiHandler := http.Handler(apiMux)

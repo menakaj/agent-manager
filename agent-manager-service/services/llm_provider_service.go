@@ -23,6 +23,7 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
 	"github.com/wso2/ai-agent-management-platform/agent-manager-service/models"
@@ -90,29 +91,6 @@ func (s *LLMProviderService) Create(orgID, createdBy string, provider *models.LL
 		return nil, utils.ErrInvalidInput
 	}
 
-	slog.Info("LLMProviderService.Create: validating template", "orgID", orgID, "handle", handle, "template", template)
-	templateExists, err := s.templateRepo.Exists(template, orgID)
-	if err != nil {
-		slog.Error("LLMProviderService.Create: failed to validate template", "orgID", orgID, "handle", handle, "template", template, "error", err)
-		return nil, fmt.Errorf("failed to validate template: %w", err)
-	}
-	if !templateExists {
-		slog.Warn("LLMProviderService.Create: template not found", "orgID", orgID, "handle", handle, "template", template)
-		return nil, utils.ErrLLMProviderTemplateNotFound
-	}
-
-	// Check if provider already exists
-	slog.Info("LLMProviderService.Create: checking if provider exists", "orgID", orgID, "handle", handle)
-	exists, err := s.providerRepo.Exists(handle, orgID)
-	if err != nil {
-		slog.Error("LLMProviderService.Create: failed to check provider exists", "orgID", orgID, "handle", handle, "error", err)
-		return nil, fmt.Errorf("failed to check provider exists: %w", err)
-	}
-	if exists {
-		slog.Warn("LLMProviderService.Create: provider already exists", "orgID", orgID, "handle", handle)
-		return nil, utils.ErrLLMProviderExists
-	}
-
 	// Parse organization UUID
 	orgUUID, err := uuid.Parse(orgID)
 	if err != nil {
@@ -141,12 +119,35 @@ func (s *LLMProviderService) Create(orgID, createdBy string, provider *models.LL
 		provider.ModelList = string(modelListBytes)
 	}
 
-	// Create provider in transaction
+	// Create provider in transaction with validation
 	slog.Info("LLMProviderService.Create: creating provider in database", "orgID", orgID, "handle", handle, "name", name, "version", version)
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		// Validate template exists within transaction
+		slog.Info("LLMProviderService.Create: validating template in transaction", "orgID", orgID, "handle", handle, "template", template)
+		templateExists, err := s.templateRepo.Exists(template, orgID)
+		if err != nil {
+			slog.Error("LLMProviderService.Create: failed to validate template", "orgID", orgID, "handle", handle, "template", template, "error", err)
+			return fmt.Errorf("failed to validate template: %w", err)
+		}
+		if !templateExists {
+			slog.Warn("LLMProviderService.Create: template not found", "orgID", orgID, "handle", handle, "template", template)
+			return utils.ErrLLMProviderTemplateNotFound
+		}
+
+		// Create provider - uniqueness enforced by DB constraint
 		return s.providerRepo.Create(tx, provider, handle, name, version, orgUUID)
 	})
 	if err != nil {
+		// Check for unique constraint violation
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+			slog.Warn("LLMProviderService.Create: provider already exists (unique constraint)", "orgID", orgID, "handle", handle)
+			return nil, utils.ErrLLMProviderExists
+		}
+		// Return template not found error directly
+		if errors.Is(err, utils.ErrLLMProviderTemplateNotFound) {
+			return nil, err
+		}
 		slog.Error("LLMProviderService.Create: failed to create provider", "orgID", orgID, "handle", handle, "error", err)
 		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}

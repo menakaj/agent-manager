@@ -62,6 +62,9 @@ var serviceProviderSet = wire.NewSet(
 	services.NewLLMProviderService,
 	services.NewLLMProxyService,
 	services.NewLLMProviderDeploymentService,
+	services.NewLLMProviderAPIKeyService,
+	services.NewLLMProxyAPIKeyService,
+	services.NewLLMProxyDeploymentService,
 	services.NewGatewayInternalAPIService,
 	ProvideLLMTemplateSeeder,
 )
@@ -76,6 +79,9 @@ var controllerProviderSet = wire.NewSet(
 	controllers.NewGatewayController,
 	controllers.NewLLMController,
 	controllers.NewLLMDeploymentController,
+	controllers.NewLLMProviderAPIKeyController,
+	controllers.NewLLMProxyAPIKeyController,
+	controllers.NewLLMProxyDeploymentController,
 	ProvideWebSocketController,
 	controllers.NewGatewayInternalController,
 )

@@ -39,17 +39,20 @@ type AppParams struct {
 	Logger         *slog.Logger
 
 	// Controllers
-	AgentController           controllers.AgentController
-	InfraResourceController   controllers.InfraResourceController
-	ObservabilityController   controllers.ObservabilityController
-	AgentTokenController      controllers.AgentTokenController
-	RepositoryController      controllers.RepositoryController
-	EnvironmentController     controllers.EnvironmentController
-	GatewayController         controllers.GatewayController
-	LLMController             controllers.LLMController
-	LLMDeploymentController   controllers.LLMDeploymentController
-	WebSocketController       controllers.WebSocketController
-	GatewayInternalController controllers.GatewayInternalController
+	AgentController              controllers.AgentController
+	InfraResourceController      controllers.InfraResourceController
+	ObservabilityController      controllers.ObservabilityController
+	AgentTokenController         controllers.AgentTokenController
+	RepositoryController         controllers.RepositoryController
+	EnvironmentController        controllers.EnvironmentController
+	GatewayController            controllers.GatewayController
+	LLMController                controllers.LLMController
+	LLMDeploymentController      controllers.LLMDeploymentController
+	LLMProviderAPIKeyController  controllers.LLMProviderAPIKeyController
+	LLMProxyAPIKeyController     controllers.LLMProxyAPIKeyController
+	LLMProxyDeploymentController controllers.LLMProxyDeploymentController
+	WebSocketController          controllers.WebSocketController
+	GatewayInternalController    controllers.GatewayInternalController
 
 	// Services
 	LLMTemplateSeeder *services.LLMTemplateSeeder
