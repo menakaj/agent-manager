@@ -57,8 +57,6 @@ var serviceProviderSet = wire.NewSet(
 	services.NewAgentTokenManagerService,
 	services.NewRepositoryService,
 	services.NewEnvironmentService,
-	services.NewEnvironmentSyncer,
-	services.NewOrganizationSyncer,
 	services.NewPlatformGatewayService,
 	services.NewLLMProviderTemplateService,
 	services.NewLLMProviderService,
