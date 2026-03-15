@@ -2030,7 +2030,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /orgs/{orgName}/gateways/{gatewayID}/environments/{envID}:
+  /orgs/{orgName}/gateways/{gatewayID}/environments/{envName}:
     parameters:
       - name: orgName
         in: path
@@ -2047,10 +2047,10 @@ paths:
         description: Gateway UUID or name
         schema:
           type: string
-      - name: envID
+      - name: envName
         in: path
         required: true
-        description: Environment UUID or name
+        description: Environment name
         schema:
           type: string
 
@@ -8974,12 +8974,12 @@ components:
           example: true
         environmentIds:
           type: array
-          description: List of environment UUIDs to assign the gateway to during creation
+          description: List of environment names to assign the gateway to during creation
           items:
             type: string
           example:
-            - 550e8400-e29b-41d4-a716-446655440000
-            - 550e8400-e29b-41d4-a716-446655440001
+            - development
+            - production
 
     UpdateGatewayRequest:
       type: object

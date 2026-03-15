@@ -27,7 +27,7 @@ type ApiAssignGatewayToEnvironmentRequest struct {
 	ApiService *GatewayEnvironmentMappingsAPIService
 	orgName    string
 	gatewayID  string
-	envID      string
+	envName    string
 }
 
 func (r ApiAssignGatewayToEnvironmentRequest) Execute() (*GatewayResponse, *http.Response, error) {
@@ -46,16 +46,16 @@ multiple gateways.
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param orgName Organization name/handle
 	@param gatewayID Gateway UUID or name
-	@param envID Environment UUID or name
+	@param envName Environment name
 	@return ApiAssignGatewayToEnvironmentRequest
 */
-func (a *GatewayEnvironmentMappingsAPIService) AssignGatewayToEnvironment(ctx context.Context, orgName string, gatewayID string, envID string) ApiAssignGatewayToEnvironmentRequest {
+func (a *GatewayEnvironmentMappingsAPIService) AssignGatewayToEnvironment(ctx context.Context, orgName string, gatewayID string, envName string) ApiAssignGatewayToEnvironmentRequest {
 	return ApiAssignGatewayToEnvironmentRequest{
 		ApiService: a,
 		ctx:        ctx,
 		orgName:    orgName,
 		gatewayID:  gatewayID,
-		envID:      envID,
+		envName:    envName,
 	}
 }
 
@@ -75,10 +75,10 @@ func (a *GatewayEnvironmentMappingsAPIService) AssignGatewayToEnvironmentExecute
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/orgs/{orgName}/gateways/{gatewayID}/environments/{envID}"
+	localVarPath := localBasePath + "/orgs/{orgName}/gateways/{gatewayID}/environments/{envName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"orgName"+"}", url.PathEscape(parameterValueToString(r.orgName, "orgName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"gatewayID"+"}", url.PathEscape(parameterValueToString(r.gatewayID, "gatewayID")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"envID"+"}", url.PathEscape(parameterValueToString(r.envID, "envID")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"envName"+"}", url.PathEscape(parameterValueToString(r.envName, "envName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -362,7 +362,7 @@ type ApiRemoveGatewayFromEnvironmentRequest struct {
 	ApiService *GatewayEnvironmentMappingsAPIService
 	orgName    string
 	gatewayID  string
-	envID      string
+	envName    string
 }
 
 func (r ApiRemoveGatewayFromEnvironmentRequest) Execute() (*http.Response, error) {
@@ -382,16 +382,16 @@ experience routing failures after this operation.
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param orgName Organization name/handle
 	@param gatewayID Gateway UUID or name
-	@param envID Environment UUID or name
+	@param envName Environment name
 	@return ApiRemoveGatewayFromEnvironmentRequest
 */
-func (a *GatewayEnvironmentMappingsAPIService) RemoveGatewayFromEnvironment(ctx context.Context, orgName string, gatewayID string, envID string) ApiRemoveGatewayFromEnvironmentRequest {
+func (a *GatewayEnvironmentMappingsAPIService) RemoveGatewayFromEnvironment(ctx context.Context, orgName string, gatewayID string, envName string) ApiRemoveGatewayFromEnvironmentRequest {
 	return ApiRemoveGatewayFromEnvironmentRequest{
 		ApiService: a,
 		ctx:        ctx,
 		orgName:    orgName,
 		gatewayID:  gatewayID,
-		envID:      envID,
+		envName:    envName,
 	}
 }
 
@@ -408,10 +408,10 @@ func (a *GatewayEnvironmentMappingsAPIService) RemoveGatewayFromEnvironmentExecu
 		return nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/orgs/{orgName}/gateways/{gatewayID}/environments/{envID}"
+	localVarPath := localBasePath + "/orgs/{orgName}/gateways/{gatewayID}/environments/{envName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"orgName"+"}", url.PathEscape(parameterValueToString(r.orgName, "orgName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"gatewayID"+"}", url.PathEscape(parameterValueToString(r.gatewayID, "gatewayID")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"envID"+"}", url.PathEscape(parameterValueToString(r.envID, "envID")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"envName"+"}", url.PathEscape(parameterValueToString(r.envName, "envName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

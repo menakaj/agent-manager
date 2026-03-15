@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	occlient "github.com/wso2/ai-agent-management-platform/agent-manager-service/clients/openchoreosvc/client"
@@ -76,28 +75,20 @@ func NewGatewayController(
 	}
 }
 
-// resolveEnvironmentUUID resolves environment name or UUID to UUID
-func (c *gatewayController) resolveEnvironmentUUID(ctx context.Context, orgName, envIdentifier string) (string, error) {
-	// First try to parse as UUID
-	if _, err := uuid.Parse(envIdentifier); err == nil {
-		// It's a valid UUID, return it
-		return envIdentifier, nil
-	}
-
-	// Not a UUID, try to resolve by name using OpenChoreo client
+// resolveEnvironmentUUID resolves an environment name to its UUID via OpenChoreo.
+func (c *gatewayController) resolveEnvironmentUUID(ctx context.Context, orgName, envName string) (string, error) {
 	environments, err := c.ocClient.ListEnvironments(ctx, orgName)
 	if err != nil {
 		return "", fmt.Errorf("failed to list environments: %w", err)
 	}
 
-	// Find environment by name
 	for _, env := range environments {
-		if env.Name == envIdentifier {
+		if env.Name == envName {
 			return env.UUID, nil
 		}
 	}
 
-	return "", fmt.Errorf("environment not found: %s", envIdentifier)
+	return "", fmt.Errorf("environment not found: %s", envName)
 }
 
 func handleGatewayErrors(w http.ResponseWriter, err error, fallbackMsg string) {
@@ -129,7 +120,8 @@ func (c *gatewayController) RegisterGateway(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate environments if present
+	// Resolve environment names to UUIDs if present
+	var envUUIDs []string
 	if len(req.EnvironmentIds) > 0 {
 		envs, err := c.ocClient.ListEnvironments(ctx, orgName)
 		if err != nil {
@@ -137,20 +129,18 @@ func (c *gatewayController) RegisterGateway(w http.ResponseWriter, r *http.Reque
 			utils.WriteErrorResponse(w, http.StatusInternalServerError, "environment validation error")
 			return
 		}
-		if len(envs) == 0 {
-			utils.WriteErrorResponse(w, http.StatusBadRequest, "no environments registered")
-			return
-		}
-		envMap := make(map[string]string)
+		envMap := make(map[string]string) // name → UUID
 		for _, env := range envs {
-			envMap[env.UUID] = env.Name
+			envMap[env.Name] = env.UUID
 		}
-		for _, envId := range req.EnvironmentIds {
-			if _, ok := envMap[envId]; !ok {
-				log.Error("environment validation failed: environment not found", "envId", envId)
-				utils.WriteErrorResponse(w, http.StatusBadRequest, "environment validation failed")
+		for _, envName := range req.EnvironmentIds {
+			envUUID, ok := envMap[envName]
+			if !ok {
+				log.Error("environment validation failed: environment not found", "envName", envName)
+				utils.WriteErrorResponse(w, http.StatusBadRequest, "environment not found: "+envName)
 				return
 			}
+			envUUIDs = append(envUUIDs, envUUID)
 		}
 	}
 
@@ -180,12 +170,10 @@ func (c *gatewayController) RegisterGateway(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Assign to environments if provided (using gateway_environment_mappings table)
-	if len(req.EnvironmentIds) > 0 {
-		for _, envID := range req.EnvironmentIds {
-			if err := c.gatewayService.AssignGatewayToEnvironment(gateway.ID, envID); err != nil {
-				log.Warn("RegisterGateway: failed to assign gateway to environment", "envID", envID, "error", err)
-				// Continue with other environments
-			}
+	for _, envUUID := range envUUIDs {
+		if err := c.gatewayService.AssignGatewayToEnvironment(gateway.ID, envUUID); err != nil {
+			log.Warn("RegisterGateway: failed to assign gateway to environment", "envUUID", envUUID, "error", err)
+			// Continue with other environments
 		}
 	}
 
@@ -363,7 +351,14 @@ func (c *gatewayController) AssignGatewayToEnvironment(w http.ResponseWriter, r 
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
-	envID := strings.TrimSpace(r.PathValue("envID"))
+	envName := strings.TrimSpace(r.PathValue("envName"))
+
+	envUUID, err := c.resolveEnvironmentUUID(ctx, orgName, envName)
+	if err != nil {
+		log.Error("AssignGatewayToEnvironment: environment not found", "envName", envName, "error", err)
+		utils.WriteErrorResponse(w, http.StatusNotFound, "environment not found: "+envName)
+		return
+	}
 
 	// Verify gateway exists
 	if _, err := c.gatewayService.GetGateway(gatewayID, orgName); err != nil {
@@ -373,7 +368,7 @@ func (c *gatewayController) AssignGatewayToEnvironment(w http.ResponseWriter, r 
 	}
 
 	// Assign via service
-	if err := c.gatewayService.AssignGatewayToEnvironment(gatewayID, envID); err != nil {
+	if err := c.gatewayService.AssignGatewayToEnvironment(gatewayID, envUUID); err != nil {
 		log.Error("AssignGatewayToEnvironment: failed to assign", "error", err)
 		handleGatewayErrors(w, err, "Failed to assign gateway to environment")
 		return
@@ -385,11 +380,19 @@ func (c *gatewayController) AssignGatewayToEnvironment(w http.ResponseWriter, r 
 func (c *gatewayController) RemoveGatewayFromEnvironment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
+	orgName := r.PathValue(utils.PathParamOrgName)
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
-	envID := strings.TrimSpace(r.PathValue("envID"))
+	envName := strings.TrimSpace(r.PathValue("envName"))
+
+	envUUID, err := c.resolveEnvironmentUUID(ctx, orgName, envName)
+	if err != nil {
+		log.Error("RemoveGatewayFromEnvironment: environment not found", "envName", envName, "error", err)
+		utils.WriteErrorResponse(w, http.StatusNotFound, "environment not found: "+envName)
+		return
+	}
 
 	// Remove via service
-	if err := c.gatewayService.RemoveGatewayFromEnvironment(gatewayID, envID); err != nil {
+	if err := c.gatewayService.RemoveGatewayFromEnvironment(gatewayID, envUUID); err != nil {
 		log.Error("RemoveGatewayFromEnvironment: failed to remove mapping", "error", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) || strings.Contains(err.Error(), "mapping not found") {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "Gateway-environment mapping not found")
