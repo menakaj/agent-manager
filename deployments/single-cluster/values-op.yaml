@@ -11,7 +11,7 @@ observer:
 openSearch:
   enabled: false
   service:
-    type: LoadBalancer
+    type: ClusterIP
 
 # Disable OpenSearch operator cluster (using standalone instead)
 openSearchCluster:

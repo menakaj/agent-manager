@@ -1,0 +1,33 @@
+# Helm values for OpenChoreo Data Plane — Production (on-your-environment)
+#
+# Key differences from k3d local dev (../values-dp.yaml):
+#   - Gateway uses standard ports 80/443 (not 19080/19443)
+#   - TLS enabled with cert reference
+#   - OpenSearch credentials should be generated (not hardcoded)
+#
+# Required environment variables (substitute before applying):
+#   BASE_DOMAIN           — e.g. amp.example.com
+#   DP_DOMAIN             — e.g. apps.amp.example.com
+#   OPENSEARCH_PASSWORD   — generated random password
+
+# Data Plane kgateway — this IS the 2nd LoadBalancer (kept as LoadBalancer).
+# Routes: agent workloads, obs-gateway (OTel ingestion), AI Gateway.
+gateway:
+  httpPort: 80
+  httpsPort: 443
+  tls:
+    enabled: true
+    hostname: "*.${DP_DOMAIN}"
+    certificateRefs:
+      - name: dp-gateway-tls
+        namespace: openchoreo-data-plane
+
+fluent-bit:
+  envFrom: []
+  env:
+    - name: OPENSEARCH_HOST
+      value: opensearch
+    - name: OPENSEARCH_USER
+      value: admin
+    - name: OPENSEARCH_PASSWORD
+      value: "${OPENSEARCH_PASSWORD}"

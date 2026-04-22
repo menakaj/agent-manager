@@ -1,0 +1,219 @@
+{{- if .Values.routeConfig.enabled }}
+{{- /*
+  Resolve the parent gateway for HTTPRoutes.
+  When createGateway=true: use the self-created amp-gateway in the release namespace.
+  When createGateway=false: use parentGateway (e.g. CP kgateway).
+*/ -}}
+{{- $parentName := .Values.routeConfig.parentGateway.name | default "amp-gateway" }}
+{{- $parentNamespace := .Values.routeConfig.parentGateway.namespace | default .Release.Namespace }}
+{{- /*
+  Determine where HTTPRoutes are created.
+  When using an external gateway, routes must be in the gateway's namespace
+  (the CP kgateway restricts allowedRoutes to Same namespace).
+  When using our own gateway, routes go in the release namespace.
+*/ -}}
+{{- $routeNamespace := .Release.Namespace }}
+{{- if not .Values.routeConfig.createGateway }}
+{{- $routeNamespace = $parentNamespace }}
+{{- end }}
+{{- if .Values.routeConfig.createGateway }}
+---
+# AMP Gateway — routes all user-facing AMP services through a single
+# Kubernetes Gateway API LoadBalancer.
+# For k3d local dev, set createGateway=false to use the existing CP kgateway instead.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: amp-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  gatewayClassName: {{ .Values.routeConfig.gatewayClassName }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: {{ .Values.routeConfig.httpPort | default 80 }}
+      {{- if .Values.routeConfig.hostname }}
+      hostname: {{ .Values.routeConfig.hostname | quote }}
+      {{- end }}
+      allowedRoutes:
+        namespaces:
+          from: All
+    {{- if .Values.routeConfig.tls.secretName }}
+    - name: https
+      protocol: HTTPS
+      port: {{ .Values.routeConfig.httpsPort | default 443 }}
+      {{- if .Values.routeConfig.hostname }}
+      hostname: {{ .Values.routeConfig.hostname | quote }}
+      {{- end }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ .Values.routeConfig.tls.secretName }}
+      allowedRoutes:
+        namespaces:
+          from: All
+    {{- end }}
+{{- end }}
+{{- if not .Values.routeConfig.createGateway }}
+---
+# ReferenceGrant: allow HTTPRoutes in {{ $routeNamespace }} to reference
+# Services in {{ .Release.Namespace }} (Console, API, Gateway Mgmt)
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: amp-services-backend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: {{ $routeNamespace }}
+  to:
+    - group: ""
+      kind: Service
+---
+# ReferenceGrant: allow HTTPRoutes in {{ $routeNamespace }} to reference
+# Services in {{ .Values.routeConfig.routes.tracesObserver.serviceNamespace }} (Traces Observer)
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: amp-traces-observer-backend
+  namespace: {{ .Values.routeConfig.routes.tracesObserver.serviceNamespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: {{ $routeNamespace }}
+  to:
+    - group: ""
+      kind: Service
+{{- end }}
+---
+# HTTPRoute: Console
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: amp-console-route
+  namespace: {{ $routeNamespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  parentRefs:
+    - name: {{ $parentName }}
+      namespace: {{ $parentNamespace }}
+  {{- if .Values.routeConfig.routes.console.hostname }}
+  hostnames:
+    - {{ .Values.routeConfig.routes.console.hostname | quote }}
+  {{- end }}
+  rules:
+    - backendRefs:
+        - name: amp-console
+          namespace: {{ .Release.Namespace }}
+          port: {{ .Values.console.service.port }}
+---
+# HTTPRoute: API
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: amp-api-route
+  namespace: {{ $routeNamespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  parentRefs:
+    - name: {{ $parentName }}
+      namespace: {{ $parentNamespace }}
+  {{- if .Values.routeConfig.routes.api.hostname }}
+  hostnames:
+    - {{ .Values.routeConfig.routes.api.hostname | quote }}
+  {{- end }}
+  rules:
+    - backendRefs:
+        - name: amp-api
+          namespace: {{ .Release.Namespace }}
+          port: {{ .Values.agentManagerService.service.port }}
+---
+# HTTPRoute: Thunder (cross-namespace backend)
+# Note: Thunder chart already creates its own HTTPRoute + ReferenceGrant.
+# Skip this route when using an external gateway to avoid duplicate routes.
+{{- if .Values.routeConfig.createGateway }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: amp-thunder-route
+  namespace: {{ $routeNamespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  parentRefs:
+    - name: {{ $parentName }}
+      namespace: {{ $parentNamespace }}
+  {{- if .Values.routeConfig.routes.thunder.hostname }}
+  hostnames:
+    - {{ .Values.routeConfig.routes.thunder.hostname | quote }}
+  {{- end }}
+  rules:
+    - backendRefs:
+        - name: {{ .Values.routeConfig.routes.thunder.serviceName }}
+          namespace: {{ .Values.routeConfig.routes.thunder.serviceNamespace }}
+          port: {{ .Values.routeConfig.routes.thunder.servicePort }}
+{{- end }}
+---
+# HTTPRoute: Traces Observer (cross-namespace backend)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: amp-traces-observer-route
+  namespace: {{ $routeNamespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  parentRefs:
+    - name: {{ $parentName }}
+      namespace: {{ $parentNamespace }}
+  {{- if .Values.routeConfig.routes.tracesObserver.hostname }}
+  hostnames:
+    - {{ .Values.routeConfig.routes.tracesObserver.hostname | quote }}
+  {{- end }}
+  rules:
+    - backendRefs:
+        - name: {{ .Values.routeConfig.routes.tracesObserver.serviceName }}
+          namespace: {{ .Values.routeConfig.routes.tracesObserver.serviceNamespace }}
+          port: {{ .Values.routeConfig.routes.tracesObserver.servicePort }}
+---
+# HTTPRoute: Gateway Management (port 9243, supports WebSocket upgrade)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: amp-gw-mgmt-route
+  namespace: {{ $routeNamespace }}
+  labels:
+    {{- include "agent-management-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  parentRefs:
+    - name: {{ $parentName }}
+      namespace: {{ $parentNamespace }}
+  {{- if .Values.routeConfig.routes.gatewayMgmt.hostname }}
+  hostnames:
+    - {{ .Values.routeConfig.routes.gatewayMgmt.hostname | quote }}
+  {{- end }}
+  rules:
+    - backendRefs:
+        - name: {{ include "agent-management-platform.agentManagerService.fullname" . }}-gateway-manager
+          namespace: {{ .Release.Namespace }}
+          port: {{ .Values.agentManagerService.gatewayMgtService.port }}
+{{- end }}

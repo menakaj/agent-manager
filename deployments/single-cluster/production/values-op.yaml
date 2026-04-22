@@ -1,0 +1,42 @@
+# Helm values for OpenChoreo Observability Plane — Production (on-your-environment)
+#
+# Key differences from k3d local dev (../values-op.yaml):
+#   - gateway.enabled: false  → no kgateway LoadBalancer (Traces Observer routed through AMP Gateway)
+#   - Thunder URLs use ${THUNDER_PUBLIC_URL} (real domain, not .localhost)
+#   - OpenSearch as ClusterIP (internal only)
+#
+# Required environment variables (substitute before applying):
+#   THUNDER_PUBLIC_URL — e.g. https://thunder.amp.example.com
+
+# Disable the kgateway Gateway CR — no LoadBalancer needed.
+# The Observer API is internal. The Traces Observer (user-facing) is routed
+# through the AMP Gateway via HTTPRoute.
+gateway:
+  enabled: false
+
+observer:
+  openSearchSecretName: opensearch-admin-credentials
+  secretName: observer-secret
+  http:
+    hostnames:
+      - observer.openchoreo-observability-plane.svc.cluster.local
+
+# Standalone OpenSearch (not operator-managed)
+openSearch:
+  enabled: false
+  service:
+    type: ClusterIP
+
+openSearchCluster:
+  enabled: false
+
+# OIDC security configuration (Thunder integration)
+security:
+  oidc:
+    jwksUrl: "http://amp-thunder-extension-service.amp-thunder.svc.cluster.local:8090/oauth2/jwks"
+    tokenUrl: "http://amp-thunder-extension-service.amp-thunder.svc.cluster.local:8090/oauth2/token"
+    authServerBaseUrl: "${THUNDER_PUBLIC_URL}"
+
+opentelemetryCollectorCustomizations:
+  tailSampling:
+    spansPerSecond: 100000

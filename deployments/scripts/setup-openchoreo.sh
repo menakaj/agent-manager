@@ -354,21 +354,25 @@ echo "8️⃣  Gateway Operator Configuration"
 # Create local config from template for development
 echo "   Creating local development config..."
 cp "${SCRIPT_DIR}/../values/api-platform-operator-full-config.yaml" "${SCRIPT_DIR}/../values/api-platform-operator-local-config.yaml"
-# Update JWKS URI for local development
 config_file="${SCRIPT_DIR}/../values/api-platform-operator-local-config.yaml"
-source_uri='http://amp-api.wso2-amp.svc.cluster.local:9000/auth/external/jwks.json'
-target_uri='http://host.docker.internal:9000/auth/external/jwks.json'
 
-if sed --version >/dev/null 2>&1; then
-  sed -i "s|${source_uri}|${target_uri}|g" "$config_file"
-else
-  sed -i '' "s|${source_uri}|${target_uri}|g" "$config_file"
-fi
-
-grep -q "$target_uri" "$config_file" || {
-  echo "Failed to rewrite JWKS URI in $config_file"
-  exit 1
+# Substitute environment-specific placeholders for k3d local development
+apply_sed() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
 }
+
+# JWKS URI: rewrite to reach agent-manager via Docker host networking
+apply_sed 's|http://amp-api.wso2-amp.svc.cluster.local:9000/auth/external/jwks.json|http://host.docker.internal:9000/auth/external/jwks.json|g' "$config_file"
+# Thunder issuer: k3d local dev value
+apply_sed 's|\${THUNDER_ISSUER:-http://thunder.amp.localhost:8080}|http://thunder.amp.localhost:8080|g' "$config_file"
+# Obs-gateway control plane host/port: k3d local dev values
+apply_sed 's|\${OBS_GATEWAY_CP_HOST:-host.docker.internal}|host.docker.internal|g' "$config_file"
+apply_sed 's|\${OBS_GATEWAY_CP_PORT:-8443}|8443|g' "$config_file"
+
 kubectl apply -f "${SCRIPT_DIR}/../values/api-platform-operator-local-config.yaml"
 echo "✅ Gateway configuration applied"
 echo ""
@@ -468,4 +472,10 @@ kubectl get pods -n amp-secrets
 echo ""
 
 echo "✅ OpenChoreo installation complete!"
+echo ""
+echo "📋 Architecture notes:"
+echo "   - AMP services (Console, API, Traces Observer) use ClusterIP — no individual LoadBalancers"
+echo "   - In local dev mode, these services are accessed via port-forward (see port-forward.sh)"
+echo "   - For Helm-based deployments (quick-start, on-your-environment), the wso2-agent-manager"
+echo "     chart creates an AMP Gateway with HTTPRoutes for unified access"
 echo ""

@@ -16,8 +16,6 @@ tracesObserver:
   resourceRequests:
     memory: 128Mi
     cpu: 250m
-  service:
-    type: LoadBalancer
   # JWT authentication — must match the agent-manager keyManager config so the
   # same user token issued by Thunder is accepted by both services.
   auth:

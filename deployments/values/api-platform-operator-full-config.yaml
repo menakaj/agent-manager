@@ -80,7 +80,10 @@ data:
                   uri: http://amp-api.wso2-amp.svc.cluster.local:9000/auth/external/jwks.json
                   skipTlsVerify: true
             - name: ThunderKeyManager
-              issuer: http://thunder.amp.localhost:8080
+              # IMPORTANT: The issuer must match the Thunder public URL used by your deployment.
+              # For k3d local dev: http://thunder.amp.localhost:8080
+              # For production: https://thunder.${BASE_DOMAIN}
+              issuer: ${THUNDER_ISSUER:-http://thunder.amp.localhost:8080}
               jwks:
                 remote:
                   uri: http://amp-thunder-extension-service.amp-thunder:8090/oauth2/jwks
@@ -106,8 +109,10 @@ data:
           tag: "1.0.0"
           pullPolicy: Always
         controlPlane:
-          host: host.docker.internal
-          port: 8443
+          # For k3d local dev: host.docker.internal (reaches host via Docker networking)
+          # For production/on-your-environment: use the in-cluster OpenChoreo API service
+          host: ${OBS_GATEWAY_CP_HOST:-host.docker.internal}
+          port: ${OBS_GATEWAY_CP_PORT:-8443}
           token:
             value: ""
             secretName: ""
@@ -125,6 +130,17 @@ data:
           size: 100Mi
         logging:
           level: info
+        deployment:
+          podSecurityContext:
+            fsGroup: 10001
+            runAsUser: 10001
+            runAsGroup: 10001
+            runAsNonRoot: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
 
       gatewayRuntime:
         image:
@@ -132,7 +148,7 @@ data:
           tag: "1.0.0"
           pullPolicy: Always
         service:
-          type: LoadBalancer
+          type: ClusterIP
           ports:
             http: 22893
             https: 22894

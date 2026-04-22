@@ -106,10 +106,19 @@ data:
           size: 100Mi
         logging:
           level: info
+        deployment:
+          {{- with .Values.apiGateway.controllerPodSecurityContext }}
+          podSecurityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.apiGateway.controllerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
       gatewayRuntime:
         service:
-          type: LoadBalancer
+          type: ClusterIP
           ports:
             http: 8084
             https: 8243

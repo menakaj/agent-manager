@@ -1,0 +1,62 @@
+# -------------------------------------------------------------------------------------
+#
+# Copyright (c) 2026, WSO2 LLC (http://www.wso2.com). All Rights Reserved.
+#
+# This software is the property of WSO2 LLC and its suppliers, if any.
+# Dissemination of any information or reproduction of any material contained
+# herein in any form is strictly forbidden, unless permitted by WSO2 expressly.
+# You may not alter or remove any copyright or other notice from copies of this content.
+#
+# --------------------------------------------------------------------------------------
+#
+# Standalone Kubernetes Job for running agent-manager-service DB migrations in cloud.
+# This is NOT managed by OpenChoreo — it is applied manually as part of a change request
+# before deploying a new agent-manager-service version that includes schema changes.
+#
+# Usage:
+#   kubectl apply -f db-migration-job.yaml -n <agent-manager-namespace>
+#
+# Prerequisites:
+#   - The OC-managed secrets (agent-manager-service-db-credentials, agent-manager-service-credentials)
+#     must already exist in the target namespace (created by the OC component deployment).
+#   - Update the image tag to match the version being deployed.
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: amp-db-migration
+  labels:
+    app.kubernetes.io/name: agent-manager-service
+    app.kubernetes.io/component: db-migration
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      name: amp-db-migration
+      labels:
+        app.kubernetes.io/name: agent-manager-service
+        app.kubernetes.io/component: db-migration
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: db-migration
+          image: "259428491004.dkr.ecr.us-east-2.amazonaws.com/system/agent-manager-service:main-8acb5dd26391122373c921a5d035640efefdc59f"
+          imagePullPolicy: Always
+          command:
+            - /go/bin/agent-manager-service
+            - -migrate
+            - -server=false
+          envFrom:
+            - configMapRef:
+                name: agent-manager-service-development-env-configs-8a739973
+            - secretRef:
+                name: agent-manager-service-development-env-secrets-3bbeafe2
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

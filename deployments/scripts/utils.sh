@@ -11,17 +11,15 @@ is_port_in_use() {
 check_required_ports() {
     local ports=(
         "6550:Kubernetes API"
-        "8080:Control Plane HTTP"
-        "8443:Control Plane HTTPS"
+        "8080:AMP Gateway HTTP"
+        "8443:AMP Gateway HTTPS"
         "8084:AI Gateway HTTP"
         "8243:AI Gateway HTTPS"
         "19080:Data Plane HTTP"
         "19443:Data Plane HTTPS"
-        "10081:Argo Workflows UI"
         "10082:Container Registry"
         "11080:Observability HTTP"
-        "11085:OpenSearch HTTPS"
-        "11081:OpenSearch Dashboard"
+        "11085:Observability HTTPS"
         "11082:OpenSearch API"
     )
 

@@ -1,0 +1,87 @@
+# Helm values for OpenBao — Production (on-your-environment)
+#
+# Key differences from k3d local dev (../values-openbao.yaml):
+#   - dev mode DISABLED — secrets persist across restarts
+#   - Persistent storage enabled
+#   - Credentials use generated values (not hardcoded)
+#
+# IMPORTANT: After installation, you must manually initialize and unseal OpenBao:
+#   kubectl exec -n openbao openbao-0 -- bao operator init
+#   kubectl exec -n openbao openbao-0 -- bao operator unseal <key>
+#
+# Required environment variables (substitute before applying):
+#   OPENSEARCH_PASSWORD          — generated random password
+#   OBSERVER_CLIENT_SECRET       — generated random password
+#   PUBLISHER_CLIENT_SECRET      — generated random password
+#   WORKFLOW_CLIENT_SECRET       — generated random password
+
+injector:
+  enabled: false
+
+server:
+  dev:
+    enabled: false
+
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    # storageClass: ""  # Uses default StorageClass; override for specific cloud providers
+
+  auditStorage:
+    enabled: true
+    size: 10Gi
+
+  standalone:
+    enabled: true
+
+  # Post-start script to configure policies and secrets.
+  # In production, consider using an init Job or Terraform instead.
+  postStart:
+    - /bin/sh
+    - -c
+    - |
+      sleep 10
+      export BAO_ADDR=http://127.0.0.1:8200
+
+      # Wait for unseal (manual step required after first install)
+      until bao status 2>/dev/null | grep -q "Sealed.*false"; do
+        echo "Waiting for OpenBao to be unsealed..."
+        sleep 5
+      done
+
+      bao auth enable kubernetes 2>/dev/null || true
+      bao write auth/kubernetes/config \
+        kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
+
+      bao policy write openchoreo-secret-reader-policy - <<POLICY
+      path "secret/data/*" { capabilities = ["read"] }
+      path "secret/metadata/*" { capabilities = ["list", "read"] }
+      POLICY
+
+      bao policy write openchoreo-secret-writer-policy - <<POLICY
+      path "secret/data/*" { capabilities = ["create", "read", "update", "delete"] }
+      path "secret/metadata/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+      POLICY
+
+      bao write auth/kubernetes/role/openchoreo-secret-reader-role \
+        bound_service_account_names=default \
+        bound_service_account_namespaces="dp*" \
+        policies=openchoreo-secret-reader-policy ttl=20m
+
+      bao write auth/kubernetes/role/openchoreo-secret-writer-role \
+        bound_service_account_names="*" \
+        bound_service_account_namespaces="openbao,openchoreo-workflow-plane" \
+        policies=openchoreo-secret-writer-policy ttl=20m
+
+      # Workflow Plane
+      bao kv put secret/workflow-plane-oauth-client-secret value="${WORKFLOW_CLIENT_SECRET}"
+
+      # AMP Monitor Evaluation publisher credentials
+      bao kv put secret/amp-publisher-client-secret value="${PUBLISHER_CLIENT_SECRET}"
+
+      # Observer (observability)
+      bao kv put secret/observer-oauth-client-secret value="${OBSERVER_CLIENT_SECRET}"
+
+      # OpenSearch (observability)
+      bao kv put secret/opensearch-username value="admin"
+      bao kv put secret/opensearch-password value="${OPENSEARCH_PASSWORD}"

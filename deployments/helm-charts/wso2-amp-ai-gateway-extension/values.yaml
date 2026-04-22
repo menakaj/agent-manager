@@ -40,7 +40,7 @@ gateway:
   # Human-readable display name
   displayName: "Default AI Gateway"
   # Virtual host (FQDN or IP) that the gateway is reachable on
-  vhost: "http://ai-gateway.amp.localhost:8084"
+  vhost: "http://ai-gateway.dp.localhost:19080"
   # Gateway type: must be "AI"
   type: "AI"
 
@@ -79,6 +79,34 @@ apiGateway:
     chartVersion: "1.0.0"
     # Policy configurations injected into the gateway
     policyConfigurations: []
+
+  # Controller pod security context.
+  # The controller uses a PVC for SQLite storage; fsGroup ensures the mounted
+  # volume is writable by the container process running as a non-root user.
+  # The gateway-controller image runs as wso2 (uid=10001, gid=10001).
+  controllerPodSecurityContext:
+    fsGroup: 10001
+    runAsUser: 10001
+    runAsGroup: 10001
+    runAsNonRoot: true
+  # Controller container security context
+  controllerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+# HTTPRoute configuration for routing AI Gateway traffic through the Data Plane kgateway.
+# This replaces the AI Gateway's own LoadBalancer with an HTTPRoute on the existing
+# Data Plane gateway, following the same pattern as agent deployment routes.
+httpRoute:
+  enabled: true
+  # The parent Gateway resource to attach this route to
+  parentGateway:
+    name: gateway-default
+    namespace: openchoreo-data-plane
+  # Hostname for routing (e.g. "gateway.example.com"). Empty matches all.
+  hostname: "ai-gateway.dp.localhost"
 
 # Bootstrap Job configuration
 bootstrap:

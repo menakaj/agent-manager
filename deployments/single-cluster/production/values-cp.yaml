@@ -1,0 +1,42 @@
+# Helm values for OpenChoreo Control Plane — Production (on-your-environment)
+#
+# Key differences from k3d local dev (../values-cp.yaml):
+#   - gateway.enabled: false  → no kgateway LoadBalancer (AMP Gateway handles user-facing traffic)
+#   - Thunder URLs use ${THUNDER_PUBLIC_URL} (real domain, not .localhost)
+#   - OpenChoreo API uses in-cluster URL only (not publicly exposed)
+#
+# Required environment variables (substitute before applying):
+#   BASE_DOMAIN        — e.g. amp.example.com
+#   THUNDER_PUBLIC_URL — e.g. https://thunder.amp.example.com
+
+# Disable the kgateway Gateway CR — no LoadBalancer needed.
+# The OpenChoreo API is internal-only, accessed via in-cluster service name.
+# User-facing services (Console, API, Thunder, Traces Observer) are routed
+# through the AMP Gateway (created by the wso2-agent-manager Helm chart).
+gateway:
+  enabled: false
+
+openchoreoApi:
+  http:
+    hostnames:
+      - "api.openchoreo.internal"
+  config:
+    server:
+      # Internal URL — not exposed externally
+      publicUrl: "http://openchoreo-api.openchoreo-control-plane.svc.cluster.local:8080"
+
+backstage:
+  enabled: false
+  baseUrl: ""
+  http:
+    hostnames:
+      - ""
+
+security:
+  enabled: true
+  oidc:
+    issuer: "${THUNDER_PUBLIC_URL}"
+    wellKnownEndpoint: "http://amp-thunder-extension-service.amp-thunder.svc.cluster.local:8090/.well-known/openid-configuration"
+    jwksUrl: "http://amp-thunder-extension-service.amp-thunder.svc.cluster.local:8090/oauth2/jwks"
+    authorizationUrl: "${THUNDER_PUBLIC_URL}/oauth2/authorize"
+    tokenUrl: "${THUNDER_PUBLIC_URL}/oauth2/token"
