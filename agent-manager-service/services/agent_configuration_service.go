@@ -349,6 +349,9 @@ func (s *agentConfigurationService) Create(ctx context.Context, orgName, project
 			s.processRollBack(ctx, rollbackResources, orgName, config.UUID)
 			return nil, fmt.Errorf("failed to resolve gateway for environment %s: %w", envName, err)
 		}
+		s.logger.Info("Create: resolved gateway for proxy deployment",
+			"environment", envName, "providerUUID", providerUUID,
+			"gatewayUUID", gateway.UUID, "gatewayName", gateway.Name)
 		// Track provider credentials immediately so they are cleaned up even if proxy creation fails.
 		rollbackResources = append(rollbackResources, rollbackResource{
 			providerAPIKeyID:  providerAPIKeyID,
@@ -725,7 +728,8 @@ func (s *agentConfigurationService) processEnvProviderChange(
 	}
 
 	if existingMapping.LLMProxy != nil {
-		oldProxyHandle = existingMapping.LLMProxy.Handle
+		// LLMProxy.Handle is gorm:"-" and not populated by GORM Preload; use Configuration.Name instead.
+		oldProxyHandle = existingMapping.LLMProxy.Configuration.Name
 	}
 
 	// Internal-agent only: inject env vars into Component/ReleaseBinding.
@@ -767,7 +771,8 @@ func (s *agentConfigurationService) processEnvProxyUpdate(
 		return rollbackResource{}, fmt.Errorf("existing proxy not found for environment %s", envName)
 	}
 
-	gateway, err := s.resolveGatewayForProxy(ctx, existingMapping.LLMProxy.Handle, orgName, envUUID)
+	// LLMProxy.Handle is gorm:"-" and not populated by GORM Preload; use Configuration.Name instead.
+	gateway, err := s.resolveGatewayForProxy(ctx, existingMapping.LLMProxy.Configuration.Name, orgName, envUUID)
 	if err != nil {
 		return rollbackResource{}, fmt.Errorf("failed to resolve gateway for environment %s: %w", envName, err)
 	}
@@ -1001,7 +1006,8 @@ func (s *agentConfigurationService) processEnvRemoval(
 ) error {
 	proxyHandle := "<nil>"
 	if mapping.LLMProxy != nil {
-		proxyHandle = mapping.LLMProxy.Handle
+		// LLMProxy.Handle is gorm:"-" and not populated by GORM Preload; use Configuration.Name instead.
+		proxyHandle = mapping.LLMProxy.Configuration.Name
 	}
 	s.logger.Info("Removing environment from configuration",
 		"environment", envUUIDStr,
@@ -1262,7 +1268,8 @@ func (s *agentConfigurationService) Update(ctx context.Context, configUUID uuid.
 						if parseErr != nil {
 							continue
 						}
-						gateway, gwErr := s.resolveGatewayForProxy(ctx, mapping.LLMProxy.Handle, orgName, envEnvUUID)
+						// LLMProxy.Handle is gorm:"-" and not populated by GORM Preload; use Configuration.Name instead.
+						gateway, gwErr := s.resolveGatewayForProxy(ctx, mapping.LLMProxy.Configuration.Name, orgName, envEnvUUID)
 						if gwErr != nil {
 							s.logger.Warn("Phase 1b: failed to resolve gateway for re-injection", "environment", envName, "err", gwErr)
 							continue
@@ -1415,7 +1422,8 @@ func (s *agentConfigurationService) Update(ctx context.Context, configUUID uuid.
 	survivingEnvCount := len(req.EnvMappings)
 	for _, mapping := range existingEnvMap {
 		if mapping.LLMProxy != nil {
-			proxiesToDelete = append(proxiesToDelete, mapping.LLMProxy.Handle)
+			// LLMProxy.Handle is gorm:"-" and not populated by GORM Preload; use Configuration.Name instead.
+			proxiesToDelete = append(proxiesToDelete, mapping.LLMProxy.Configuration.Name)
 		}
 		removedEnvName := uuidToEnvName[mapping.EnvironmentUUID.String()]
 		isLastEnv := survivingEnvCount == 0
@@ -1733,6 +1741,9 @@ func (s *agentConfigurationService) Delete(ctx context.Context, configUUID uuid.
 // This ensures the proxy is deployed to the same gateway as its provider.
 // Falls back to resolveGatewayForEnvironment if the provider has no active deployments.
 func (s *agentConfigurationService) resolveGatewayForProvider(ctx context.Context, providerUUIDStr string, orgName string, envUUID uuid.UUID) (*models.Gateway, error) {
+	s.logger.Info("resolveGatewayForProvider: starting",
+		"providerUUID", providerUUIDStr, "orgName", orgName, "envUUID", envUUID)
+
 	providerUUID, err := uuid.Parse(providerUUIDStr)
 	if err != nil {
 		s.logger.Warn("Invalid provider UUID, falling back to environment resolution",
@@ -1741,28 +1752,41 @@ func (s *agentConfigurationService) resolveGatewayForProvider(ctx context.Contex
 	}
 
 	gatewayIDs, err := s.llmProxyDeploymentService.GetDeployedGatewaysByProvider(providerUUID, orgName)
+	s.logger.Info("resolveGatewayForProvider: GetDeployedGatewaysByProvider result",
+		"providerUUID", providerUUID, "gatewayIDs", gatewayIDs, "error", err)
+
 	if err == nil && len(gatewayIDs) > 0 {
 		envIDStr := envUUID.String()
 		// Prefer a gateway that is mapped to the target environment
 		for _, gwID := range gatewayIDs {
 			exists, mapErr := s.gatewayRepo.EnvironmentMappingExists(gwID, envIDStr)
+			s.logger.Info("resolveGatewayForProvider: checking env mapping",
+				"gatewayID", gwID, "envUUID", envIDStr, "exists", exists, "error", mapErr)
 			if mapErr != nil || !exists {
 				continue
 			}
 			gw, gwErr := s.gatewayRepo.GetByUUID(gwID)
 			if gwErr == nil && gw != nil {
+				s.logger.Info("resolveGatewayForProvider: resolved via provider deployment + env mapping",
+					"gatewayUUID", gw.UUID, "gatewayName", gw.Name)
 				return gw, nil
 			}
 		}
 		// No environment-matched gateway; try first as fallback
+		s.logger.Warn("resolveGatewayForProvider: no env-mapped gateway found, using first provider gateway as fallback",
+			"providerUUID", providerUUID, "fallbackGatewayID", gatewayIDs[0])
 		gw, gwErr := s.gatewayRepo.GetByUUID(gatewayIDs[0])
 		if gwErr == nil && gw != nil {
+			s.logger.Info("resolveGatewayForProvider: resolved via first provider gateway fallback",
+				"gatewayUUID", gw.UUID, "gatewayName", gw.Name)
 			return gw, nil
 		}
 		s.logger.Warn("Gateway not found for provider deployment, falling back to environment resolution",
 			"providerUUID", providerUUID, "gatewayUUID", gatewayIDs[0], "error", gwErr)
 	}
 
+	s.logger.Warn("resolveGatewayForProvider: no provider deployments found, falling back to resolveGatewayForEnvironment",
+		"providerUUID", providerUUID, "envUUID", envUUID)
 	return s.resolveGatewayForEnvironment(ctx, envUUID, orgName)
 }
 
@@ -1771,9 +1795,15 @@ func (s *agentConfigurationService) resolveGatewayForProvider(ctx context.Contex
 // when multiple AI gateways are mapped to the same environment.
 // Falls back to resolveGatewayForEnvironment if no active deployment is found.
 func (s *agentConfigurationService) resolveGatewayForProxy(ctx context.Context, proxyHandle, orgName string, envUUID uuid.UUID) (*models.Gateway, error) {
-	deployedStatus := string(models.DeploymentStatusDeployed)
-	deployments, err := s.llmProxyDeploymentService.GetLLMProxyDeployments(proxyHandle, orgName, nil, &deployedStatus)
+	s.logger.Info("resolveGatewayForProxy: starting",
+		"proxyHandle", proxyHandle, "orgName", orgName, "envUUID", envUUID)
+	// Query without status filter — we need to know which gateway the proxy was
+	// targeted at regardless of whether the deployment is currently healthy.
+	// A transient UNDEPLOYED/failed status should not cause gateway re-selection.
+	deployments, err := s.llmProxyDeploymentService.GetLLMProxyDeployments(proxyHandle, orgName, nil, nil)
 	if err == nil && len(deployments) > 0 {
+		s.logger.Info("resolveGatewayForProxy: found deployments",
+			"proxyHandle", proxyHandle, "count", len(deployments))
 		envIDStr := envUUID.String()
 		// Find the deployment whose gateway is mapped to the target environment
 		for _, dep := range deployments {
@@ -1784,23 +1814,31 @@ func (s *agentConfigurationService) resolveGatewayForProxy(ctx context.Context, 
 			}
 			gw, gwErr := s.gatewayRepo.GetByUUID(gwUUID)
 			if gwErr == nil && gw != nil {
+				s.logger.Info("resolveGatewayForProxy: resolved via proxy deployment + env mapping",
+					"proxyHandle", proxyHandle, "gatewayUUID", gw.UUID, "gatewayName", gw.Name)
 				return gw, nil
 			}
 		}
 		// No environment-matched deployment found; try first deployment as fallback
 		gw, gwErr := s.gatewayRepo.GetByUUID(deployments[0].GatewayUUID.String())
 		if gwErr == nil && gw != nil {
+			s.logger.Info("resolveGatewayForProxy: resolved via first proxy deployment fallback",
+				"proxyHandle", proxyHandle, "gatewayUUID", gw.UUID, "gatewayName", gw.Name)
 			return gw, nil
 		}
 		s.logger.Warn("Gateway not found for proxy deployment, falling back to environment resolution",
 			"proxyHandle", proxyHandle, "gatewayUUID", deployments[0].GatewayUUID, "error", gwErr)
 	}
 
+	s.logger.Warn("resolveGatewayForProxy: no deployments found, falling back to resolveGatewayForEnvironment",
+		"proxyHandle", proxyHandle, "envUUID", envUUID)
 	return s.resolveGatewayForEnvironment(ctx, envUUID, orgName)
 }
 
 // resolveGatewayForEnvironment selects gateway with AI-first preference
 func (s *agentConfigurationService) resolveGatewayForEnvironment(ctx context.Context, envUUID uuid.UUID, orgName string) (*models.Gateway, error) {
+	s.logger.Info("resolveGatewayForEnvironment: starting",
+		"envUUID", envUUID, "orgName", orgName)
 	envIDStr := envUUID.String()
 	aiType := "ai"
 	activeStatus := true
@@ -1814,8 +1852,12 @@ func (s *agentConfigurationService) resolveGatewayForEnvironment(ctx context.Con
 		Limit:             1,
 	})
 	if err == nil && len(gateways) > 0 {
+		s.logger.Info("resolveGatewayForEnvironment: found AI gateway",
+			"gatewayUUID", gateways[0].UUID, "gatewayName", gateways[0].Name)
 		return gateways[0], nil
 	}
+	s.logger.Info("resolveGatewayForEnvironment: no AI gateway found, trying any active gateway",
+		"envUUID", envUUID, "error", err)
 
 	// Fallback to any active gateway
 	gateways, err = s.gatewayRepo.ListWithFilters(repositories.GatewayFilterOptions{
@@ -1830,6 +1872,8 @@ func (s *agentConfigurationService) resolveGatewayForEnvironment(ctx context.Con
 	if len(gateways) == 0 {
 		return nil, errors.New("no active gateway found for environment")
 	}
+	s.logger.Info("resolveGatewayForEnvironment: found fallback gateway",
+		"gatewayUUID", gateways[0].UUID, "gatewayName", gateways[0].Name)
 
 	return gateways[0], nil
 }
@@ -2237,7 +2281,8 @@ func (s *agentConfigurationService) buildConfigResponse(ctx context.Context, con
 
 			// Add proxy URL for external agents (subsequent GET calls)
 			if includeProxyURL {
-				gateway, err := s.resolveGatewayForProxy(ctx, mapping.LLMProxy.Handle, config.OrganizationName, mapping.EnvironmentUUID)
+				// LLMProxy.Handle is gorm:"-" and not populated by GORM Preload; use Configuration.Name instead.
+				gateway, err := s.resolveGatewayForProxy(ctx, mapping.LLMProxy.Configuration.Name, config.OrganizationName, mapping.EnvironmentUUID)
 				if err == nil && mapping.LLMProxy.Configuration.Context != nil {
 					url := fmt.Sprintf("%s%s", gateway.Vhost, *mapping.LLMProxy.Configuration.Context)
 					proxyInfo.URL = &url
