@@ -2301,6 +2301,9 @@ type CreateLLMProviderRequest struct {
 	Policies     *[]LLMPolicy           `json:"policies,omitempty"`
 	RateLimiting *LLMRateLimitingConfig `json:"rateLimiting,omitempty"`
 
+	// Resilience Route-level request/idle timeouts applied at the API level (no per-operation override for LLM providers, LLM proxies, or MCP proxies).
+	Resilience *Resilience `json:"resilience,omitempty"`
+
 	// Security Security configuration. Exactly one variant is active: apiKey or identity (both omitted / enabled=false means no security).
 	Security *SecurityConfig `json:"security,omitempty"`
 
@@ -3411,6 +3414,9 @@ type LLMProviderResponse struct {
 	Policies     *[]LLMPolicy           `json:"policies,omitempty"`
 	RateLimiting *LLMRateLimitingConfig `json:"rateLimiting,omitempty"`
 
+	// Resilience Route-level request/idle timeouts applied at the API level (no per-operation override for LLM providers, LLM proxies, or MCP proxies).
+	Resilience *Resilience `json:"resilience,omitempty"`
+
 	// Security Security configuration. Exactly one variant is active: apiKey or identity (both omitted / enabled=false means no security).
 	Security *SecurityConfig `json:"security,omitempty"`
 
@@ -3516,6 +3522,9 @@ type LLMProxyConfig struct {
 
 	// Provider Provider reference
 	Provider *string `json:"provider,omitempty"`
+
+	// Resilience Route-level request/idle timeouts applied at the API level (no per-operation override for LLM providers, LLM proxies, or MCP proxies).
+	Resilience *Resilience `json:"resilience,omitempty"`
 
 	// Security Security configuration. Exactly one variant is active: apiKey or identity (both omitted / enabled=false means no security).
 	Security *SecurityConfig `json:"security,omitempty"`
@@ -3785,6 +3794,9 @@ type MCPProxyEndpoint struct {
 	// Name Human-readable endpoint name
 	Name     *string      `json:"name,omitempty"`
 	Policies *[]MCPPolicy `json:"policies,omitempty"`
+
+	// Resilience Route-level request/idle timeouts applied at the API level (no per-operation override for LLM providers, LLM proxies, or MCP proxies).
+	Resilience *Resilience `json:"resilience,omitempty"`
 
 	// Security Security configuration. Exactly one variant is active: apiKey or identity (both omitted / enabled=false means no security).
 	Security *SecurityConfig `json:"security,omitempty"`
@@ -4542,6 +4554,15 @@ type RequestRateLimit struct {
 	Reset   RateLimitResetWindow `json:"reset"`
 }
 
+// Resilience Route-level request/idle timeouts applied at the API level (no per-operation override for LLM providers, LLM proxies, or MCP proxies).
+type Resilience struct {
+	// IdleTimeout Per-route stream idle timeout. "0s" disables it; omit to use the gateway's default.
+	IdleTimeout *string `json:"idleTimeout,omitempty"`
+
+	// Timeout Max duration for the whole request→upstream-response. "0s" disables it; omit to use the gateway's default.
+	Timeout *string `json:"timeout,omitempty"`
+}
+
 // ResourceConfig defines model for ResourceConfig.
 type ResourceConfig struct {
 	Limits   *ResourceLimits   `json:"limits,omitempty"`
@@ -5072,6 +5093,9 @@ type UpdateLLMProviderRequest struct {
 	// Policies Updated list of policies
 	Policies     *[]LLMPolicy           `json:"policies,omitempty"`
 	RateLimiting *LLMRateLimitingConfig `json:"rateLimiting,omitempty"`
+
+	// Resilience Route-level request/idle timeouts applied at the API level (no per-operation override for LLM providers, LLM proxies, or MCP proxies).
+	Resilience *Resilience `json:"resilience,omitempty"`
 
 	// Security Security configuration. Exactly one variant is active: apiKey or identity (both omitted / enabled=false means no security).
 	Security *SecurityConfig `json:"security,omitempty"`
