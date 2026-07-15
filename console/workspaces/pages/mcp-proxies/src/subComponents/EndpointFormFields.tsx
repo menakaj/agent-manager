@@ -50,7 +50,10 @@ import {
   HelpCircle,
 } from "@wso2/oxygen-ui-icons-react";
 import { useSnackBar } from "@agent-management-platform/views";
-import { validateEndpointUrl } from "@agent-management-platform/shared-component";
+import {
+  ResilienceTimeoutFields,
+  validateEndpointUrl,
+} from "@agent-management-platform/shared-component";
 import { MCPCapabilitiesView } from "../components/MCPCapabilitiesView";
 
 // EndpointDraft is a single endpoint captured in the form. Its `id` maps to the backend
@@ -63,6 +66,9 @@ export interface EndpointDraft {
   url: string;
   authHeader: string;
   authValue: string;
+  // Route-level request/idle timeouts (e.g. "15s", "500ms") for this endpoint.
+  resilienceTimeout: string;
+  resilienceIdleTimeout: string;
   // Environment UUIDs (not names) this endpoint serves — stable across renames.
   environments: string[];
   fetchedInfo: MCPServerInfoFetchResponse;
@@ -77,6 +83,8 @@ const MASKED_CREDENTIAL_VALUE = "••••••••••••";
 // How long to wait after the last URL/auth edit before auto-fetching server info,
 // so a fetch isn't fired on every keystroke.
 const FETCH_DEBOUNCE_MS = 600;
+
+const DURATION_PATTERN = /^\d+(ms|s|m|h)$/;
 
 export interface EndpointFormFieldsProps {
   orgId: string;
@@ -120,8 +128,20 @@ export function EndpointFormFields({
     useState<MCPServerInfoFetchResponse | null>(
       initialDraft?.fetchedInfo ?? null,
     );
+  const [resilienceTimeout, setResilienceTimeout] = useState(
+    initialDraft?.resilienceTimeout ?? "",
+  );
+  const [resilienceIdleTimeout, setResilienceIdleTimeout] = useState(
+    initialDraft?.resilienceIdleTimeout ?? "",
+  );
   const [urlError, setUrlError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [resilienceTimeoutError, setResilienceTimeoutError] = useState<string | null>(
+    null,
+  );
+  const [resilienceIdleTimeoutError, setResilienceIdleTimeoutError] = useState<
+    string | null
+  >(null);
 
   const trimmedUrl = url.trim();
   const isFetched = Boolean(fetchedInfo);
@@ -137,9 +157,15 @@ export function EndpointFormFields({
     trimmedUrl !== initialDraft.url ||
     authHeader.trim() !== initialDraft.authHeader ||
     (!isCredentialMasked && authValue.trim().length > 0) ||
+    resilienceTimeout.trim() !== (initialDraft.resilienceTimeout ?? "") ||
+    resilienceIdleTimeout.trim() !== (initialDraft.resilienceIdleTimeout ?? "") ||
     !sameIdSet(selectedEnvIds, initialDraft.environments) ||
     capabilitiesChanged(fetchedInfo, initialDraft.fetchedInfo);
-  const canSave = canAdd && hasChanges;
+  const canSave =
+    canAdd &&
+    hasChanges &&
+    !resilienceTimeoutError &&
+    !resilienceIdleTimeoutError;
 
   const clearFetched = useCallback(() => {
     setFetchedInfo(null);
@@ -263,6 +289,8 @@ export function EndpointFormFields({
       url: trimmedUrl,
       authHeader: authHeader.trim(),
       authValue: resolvedAuthValue,
+      resilienceTimeout: resilienceTimeout.trim(),
+      resilienceIdleTimeout: resilienceIdleTimeout.trim(),
       environments: selectedEnvIds,
       fetchedInfo,
       serverName:
@@ -275,6 +303,8 @@ export function EndpointFormFields({
   }, [
     authHeader,
     authValue,
+    resilienceTimeout,
+    resilienceIdleTimeout,
     fetchedInfo,
     initialDraft,
     isCredentialMasked,
@@ -423,6 +453,29 @@ export function EndpointFormFields({
           </Form.Stack>
         </AccordionDetails>
       </Accordion>
+
+      <ResilienceTimeoutFields
+        requestTimeout={resilienceTimeout}
+        onRequestTimeoutChange={(value) => {
+          setResilienceTimeout(value);
+          setResilienceTimeoutError(
+            value.trim() && !DURATION_PATTERN.test(value.trim())
+              ? "Enter a duration like 5s, 500ms, or 1m"
+              : null,
+          );
+        }}
+        requestTimeoutError={resilienceTimeoutError}
+        idleTimeout={resilienceIdleTimeout}
+        onIdleTimeoutChange={(value) => {
+          setResilienceIdleTimeout(value);
+          setResilienceIdleTimeoutError(
+            value.trim() && !DURATION_PATTERN.test(value.trim())
+              ? "Enter a duration like 5s, 500ms, or 1m"
+              : null,
+          );
+        }}
+        idleTimeoutError={resilienceIdleTimeoutError}
+      />
 
       <FormControl fullWidth>
         <FormLabel required>Environments</FormLabel>

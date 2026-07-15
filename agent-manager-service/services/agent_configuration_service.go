@@ -4297,6 +4297,7 @@ func buildAgentMCPConfigProxy(
 	// empty and deployment fails clearly ("upstream URL is required").
 	endpoint, _ := resolveMCPEndpointForEnv(source, mapping.EnvironmentUUID.String())
 	var upstream models.UpstreamConfig
+	var resilience *models.Resilience
 	var policies []models.MCPPolicy
 	var capabilities *models.MCPProxyCapabilities
 	var security *models.SecurityConfig
@@ -4306,6 +4307,7 @@ func buildAgentMCPConfigProxy(
 			upstreamEndpoint := *cfg.Upstream
 			upstream.Main = &upstreamEndpoint
 		}
+		resilience = cfg.Resilience
 		policies = cfg.Policies
 		capabilities = cfg.Capabilities
 		security = cfg.Security
@@ -4322,6 +4324,7 @@ func buildAgentMCPConfigProxy(
 			Vhost:        source.Configuration.Vhost,
 			SpecVersion:  source.Configuration.SpecVersion,
 			Upstream:     upstream,
+			Resilience:   resilience,
 			Policies:     policies,
 			Capabilities: capabilities,
 			Security:     security,
