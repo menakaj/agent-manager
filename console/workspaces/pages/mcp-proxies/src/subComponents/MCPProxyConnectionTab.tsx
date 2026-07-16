@@ -46,7 +46,7 @@ import {
 } from "@agent-management-platform/shared-component";
 
 const MASKED_CREDENTIAL_VALUE = "••••••••••••";
-const DURATION_PATTERN = /^\d+(ms|s|m|h)$/;
+const DURATION_PATTERN = /^\d+(\.\d+)?(ms|s|m|h)$/;
 
 export type MCPProxyConnectionTabProps = {
   config: MCPEndpointConfig | undefined;
